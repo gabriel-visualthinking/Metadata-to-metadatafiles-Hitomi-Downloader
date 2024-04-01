@@ -17,7 +17,7 @@ Simply decompress the .zip file and install the `script.hds` in the Hitomi Downl
 ## Notes
 
 - This is my first script using Python with ChatGPT.
-- The ComicInfo.xml saves 'Tags' as '<Genre>', 'Group' as '<Team>', and 'Language' is converted to '<LanguageISO>' specifically to ensure compatibility with ComicRack.
+- The ComicInfo.xml saves 'Tags' as 'Genre', 'Group' as 'Team', and 'Language' is converted to 'LanguageISO' specifically to ensure compatibility with ComicRack.
 - The compression option does not save the `metadata.file`; users must compress it manually.
 - This script does not require the `info.txt` option to be active.
 - The script may not work with "anime" files, and this functionality will not be included.

@@ -1,3 +1,3 @@
 # Metadata-to-metadatafiles-Hitomi-Downloader
 
-Workinng with scripts and metadata
+Working with scripts and metadata

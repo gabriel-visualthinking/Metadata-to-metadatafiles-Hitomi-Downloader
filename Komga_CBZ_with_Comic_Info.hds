@@ -1,0 +1,101 @@
+#coding: utf8
+#title: ComicInfo.xml After Task Finished
+#author: nytkuu
+
+import re
+from utils import Hook
+import os
+import zipfile
+
+languages = {
+    "Japanese": "ja", "Chinese": "zh", "Korean": "ko", "Burmese": "my", "Thai": "th", "Persian": "fa",
+    "Arabic": "ar", "Hebrew": "he", "Ukrainian": "uk", "Russian": "ru", "Mongolian": "mn", "Bulgarian": "bg",
+    "Greek": "el", "Turkish": "tr", "Vietnamese": "vi", "Tagalog": "tl", "Swedish": "sv", "Finnish": "fi",
+    "Serbian": "sr", "Slovak": "sk", "Albanian": "sq", "Romanian": "ro", "Portuguese": "pt", "Polish": "pl",
+    "Norwegian": "nb", "Dutch": "nl", "Hungarian": "hu", "Latin": "la", "Italian": "it", "Icelandic": "is",
+    "Hindi": "hi", "French": "fr", "Esperanto": "eo", "Spanish": "es", "English": "en", "Estonian": "et",
+    "German": "de", "Danish": "da", "Czech": "cs", "Cebuano": "ceb", "Catalan": "ca", "Javanese": "jv",
+    "Indonesian": "id", "N/A": "N/A"
+}
+
+types_mapping = {
+    "imageset": "ImageSet", "artistcg": "ArtistCG", "gamecg": "GameCG", "manga": "Manga",
+    "doujinshi": "Doujinshi", "western": "Western", "non-h": "Non-H", "cosplay": "Cosplay",
+    "asianporn": "AsianPorn", "misc": "Misc"
+}
+
+def transform_tags(tags):
+    transformed_tags = []
+    for tag in tags.split(','):
+        parts = tag.split(':')
+        if len(parts) >= 2:
+            gender, feature = parts
+            gender = gender.strip()
+            feature = feature.strip()
+            if gender in ('female', 'male'):
+                transformed_tags.append(f"{'♀' if gender == 'female' else '♂'} {feature}")
+            else:
+                transformed_tags.append(tag.strip())
+        else:
+            transformed_tags.append(tag.strip())
+    return ', '.join(transformed_tags)
+
+def write_comic_info(comic_info_path, **kwargs):
+    with open(comic_info_path, "w", encoding='utf-8') as f:
+        f.write("<?xml version='1.0' encoding='UTF-8'?>\n<ComicInfo xmlns:xsd='http://www.w3.org/2001/XMLSchema' xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>\n")
+        for key, value in kwargs.items():
+            value = value.replace("&", "&amp;")
+            f.write(f"<{key}>{value}</{key}>\n")
+        f.write("</ComicInfo>")
+
+def add_to_archive(archive_name, file_name):
+    with zipfile.ZipFile(archive_name, 'a') as archive:
+        archive.write(file_name, arcname="ComicInfo.xml")
+
+@Hook.task_finished('ComicInfo.xml')
+def hook_ComicInfo(cw):
+    web = cw.type
+    
+    if web not in {'hitomi', 'ehen'} or cw.gal is None:
+        return
+    
+    url = cw.url
+    folder_path = cw.dir
+    comic_info_path = os.path.join(folder_path, "ComicInfo.xml")
+    
+    info = dict(line.split(': ', 1) for line in str(cw.gal).strip().split('\n') if ': ' in line)
+    id, title, artists, groups, type_key, series, characters, tags, language = list(info.values())[:9]
+    
+    if type_key == 'anime':
+        return
+    if web in 'ehen':
+        matches = re.findall(r'\[([^]]+)\]', title)
+        matched_values = {}
+        
+        for idx, match in enumerate(matches):
+            if re.search(artists, match, re.IGNORECASE) or language in match:
+                matched_values[f'valor{idx + 1}'] = match
+                title = re.sub(rf'\s?\[{re.escape(match)}\]', '', title).strip()
+    
+    transformed_tags = transform_tags(tags)
+    language_iso = languages.get(language, "")
+    type_name = types_mapping.get(type_key, "")
+    
+    write_comic_info(
+        comic_info_path,
+        Title=title,
+        Series=series,
+        AlternateNumber=id,
+        Penciller=artists,
+        Tags=transformed_tags,
+        Web=url,
+        LanguageISO=language_iso,
+        Format=type_name,
+        Characters=characters,
+        Teams=groups
+    )
+
+    add_to_archive(
+        os.path.abspath(os.path.join(folder_path, '..', os.path.basename(folder_path) + ".cbz")),
+        comic_info_path
+    )
